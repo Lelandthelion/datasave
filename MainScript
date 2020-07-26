@@ -1,0 +1,192 @@
+local DataStoreService = game:GetService("DataStoreService")
+
+local myDataStore = DataStoreService:GetDataStore("myDataStore")
+
+local replicatedStorage = game:GetService("ReplicatedStorage")
+
+local function equipPet (player,pet)
+	
+	local character = player.Character
+	
+	if pet ~= nil and character ~= nil then
+		
+		if character:FindFirstChild(player.Name.."'s Pet") then character[player.Name.."'s Pet"]:Destroy() end
+		
+		if character.HumanoidRootPart:FindFirstChild("attachmentCharacter") then 
+			character.HumanoidRootPart:FindFirstChild("attachmentCharacter"):Destroy()
+		end
+		
+		
+		pet.Name = player.Name.."'s Pet"
+		
+		pet:SetPrimaryPartCFrame(character.HumanoidRootPart.CFrame)
+		
+		local modelSize = pet.PrimaryPart.Size
+		
+		local attachmentCharacter = Instance.new("Attachment")
+		attachmentCharacter.Visible = false
+		attachmentCharacter.Name = "attachmentCharacter"
+		attachmentCharacter.Parent = character.HumanoidRootPart
+		attachmentCharacter.Position = Vector3.new(1, 1, 0) + modelSize
+		
+		
+		local attachmentPet = Instance.new("Attachment")
+		attachmentPet.Visible = false
+		attachmentPet.Parent = pet.PrimaryPart
+		
+		local alignPosition = Instance.new("AlignPosition")
+		alignPosition.MaxForce = 25000
+		alignPosition.Attachment0 = attachmentPet
+		alignPosition.Attachment1 = attachmentCharacter
+		alignPosition.Responsiveness = 25
+		alignPosition.Parent = pet 
+		
+		local alignOrientation = Instance.new("AlignOrientation")
+		alignOrientation.MaxTorque = 25000
+		alignOrientation.Attachment0 = attachmentPet
+		alignOrientation.Attachment1 = attachmentCharacter
+		alignOrientation.Responsiveness = 25
+		alignOrientation.Parent = pet 
+		
+		pet.Parent = character
+		
+	end
+end
+
+
+game.Players.PlayerAdded:Connect(function(player)
+	
+	local leaderstats = Instance.new("Folder")
+	leaderstats.Name = "leaderstats"
+	leaderstats.Parent = player
+	
+	local cash = Instance.new("IntValue")
+	cash.Name = "Cash"
+	cash.Parent = leaderstats
+	
+	local inventory = Instance.new("Folder")
+	inventory.Name = "PetInventory"
+	inventory.Parent = player
+	
+	local data
+	local success, errormessage = pcall(function()
+		data = myDataStore:SetAsync("-pets"..player.UserId)
+	end)
+	
+		if success and data then
+		for _, petName in pairs(data) do
+			if replicatedStorage.Pets:FindFirstChild(petName) then
+				local petValue = Instance.new("BoolValue")
+				petValue.Name = petName
+				petValue.Parent = petFolder
+			end
+		end
+	end
+	
+	
+	
+	
+	local data
+	local success, errormessage = pcall(function()
+		data = myDataStore:SetAsync(player.UserId.."-cash",player.leaderstats.Cash.Value)
+		
+	end)
+	
+		if success then
+			cash.Value = data
+	else
+		print("ERROR(God damnit bobby)")
+		warn (errormessage)
+	end
+		
+	local equippedPet = Instance.new("StringValue")
+	equippedPet.Name = "EquippedPet"
+	equippedPet.Parent = player
+	
+	player.CharacterAdded:Connect(function(char)
+		if game.ReplicatedStorage:WaitForChild("Pets"):FindFirstChild(equippedPet.Value) then
+			equipPet(player,game.ReplicatedStorage:WaitForChild("Pets"):FindFirstChild(equippedPet.Value):Clone())
+		end
+	end)
+	
+	equippedPet.Changed:Connect(function()
+		if equippedPet.Value ~= nil then
+			if game.ReplicatedStorage:WaitForChild("Pets"):FindFirstChild(equippedPet.Value) then
+				equipPet(player,game.ReplicatedStorage:WaitForChild("Pets"):FindFirstChild(equippedPet.Value):Clone())
+			end
+		end
+	end)
+	
+end)
+
+game.ReplicatedStorage.EquipPet.OnServerEvent:Connect(function(player,petName)
+	local pet = game.ReplicatedStorage.Pets:FindFirstChild(petName)
+	
+	if pet and player.PetInventory:FindFirstChild(petName) then
+		player.EquippedPet.Value = petName
+	end
+end)
+game.ReplicatedStorage.UnequipPet.OnServerEvent:Connect(function(player)
+	player.EquippedPet.Value = ""
+	if player.Character:FindFirstChild(player.Name.."'s Pet") then
+		player.Character[player.Name.."'s Pet"]:Destroy()
+	end
+	if player.Character.HumanoidRootPart:FindFirstChild("attachmentCharacter") then
+		player.Character.HumanoidRootPart:FindFirstChild("attachmentCharacter"):Destroy()
+				
+	end
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+	
+	local success, errormessage = pcall(function()
+		myDataStore:SetAsync(player.UserId.."-cash",player.leaderstats.Cash.Value)
+	end)
+	
+	if success then
+		print("Player Data Successfuly saved! Yes :D")
+	else
+		print("ERROR(God damnit bobby)")
+		warn (errormessage)
+	end
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+	
+	local petTable = {}
+	
+	for _, pet in pairs(player.PetInventory:GetChildren()) do
+		table.insert(petTable,pet.Name)
+		print(pet.Name)
+	end
+	
+	local success, errormessage = pcall(function()
+		myDataStore:SetAsync("-pets"..player.UserId,petTable)
+	end)
+	
+	print("test")
+	
+	if success then
+		print("Saved")
+	else
+		print(errormessage)
+	end
+	
+end)
+
+game:BindToClose(function()
+	for _, player in pairs(game.Player:GetPlayers()) do
+		local petTable = {}
+		
+		for _, pet in pairs(player.PetInventory:GetChildren()) do
+			table.insert(petTable,pet.Name)
+			print(pet.Name)
+		end
+		
+		local success, errormessage = pcall(function()
+			myDataStore:SetAsync("-pets"..player.UserId,petTable)
+		end)
+		
+		if success then print("Saved on BTC for"..player.Name) end
+	end
+end)
